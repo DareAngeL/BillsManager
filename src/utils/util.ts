@@ -37,10 +37,16 @@ export const getGroups = async () => {
 export const deleteGroup = async (data: string) => {
   try {
     const asyncGroups = await AsyncStorage.getItem(ASYNC_STORAGE_KEY_GROUPS);
-    if (asyncGroups !== null) {
+    const asyncBills = await AsyncStorage.getItem(ASYNC_STORAGE_KEY);
+    if (asyncGroups !== null && asyncBills !== null) {
       const groups: string[] = JSON.parse(asyncGroups);
+      const bills: {[group: string]: BillData[]} = JSON.parse(asyncBills);
+
       const newGroups = groups.filter((group) => group !== data);
       await AsyncStorage.setItem(ASYNC_STORAGE_KEY_GROUPS, JSON.stringify(newGroups));
+
+      delete bills[data];
+      await AsyncStorage.setItem(ASYNC_STORAGE_KEY, JSON.stringify(bills));
       return true;
     }
   } catch (error) {
@@ -106,19 +112,16 @@ export const deleteBill = async (group: string, id: string) => {
   }
 };
 
-export const getBills = async (group?: string) => {
-  if (!group) {
-    return null;
-  }
+export const getBills = async () => {
 
   try {
     const value = await AsyncStorage.getItem(ASYNC_STORAGE_KEY);
     console.log(value);
     
     if (value !== null) {
-      return JSON.parse(value)[group] as BillData[];
+      return JSON.parse(value) as {[group: string]: BillData[]};
     }
-    return [] as BillData[];
+    return {} as {[group: string]: BillData[]};
   } catch (error) {
     console.log(error);
   }

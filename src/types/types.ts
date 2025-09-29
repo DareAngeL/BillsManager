@@ -7,6 +7,10 @@ export type BillData = {
 };
 
 export type GlobalContext = {
+  HomeContext: HomeContext;
+};
+
+export type HomeContext = {
   activeGroup: string | undefined;
   setActiveGroup: React.Dispatch<React.SetStateAction<string | undefined>>;
-};
+}

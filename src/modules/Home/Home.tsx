@@ -1,300 +1,97 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import {FlatList, StatusBar} from 'react-native';
-import {Box} from '../../components/ui/box';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {Heading} from '../../components/ui/heading';
+import { Dimensions, StatusBar } from 'react-native';
+import { Box } from '../../components/ui/box';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Heading } from '../../components/ui/heading';
 import clsx from 'clsx';
-import {Text} from '../../components/ui/text';
-import {HStack} from '../../components/ui/hstack';
-import {Button, ButtonText} from '../../components/ui/button';
-import BillCard from '../../components/cards/BillCard';
-import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {RootStackParamList} from '@/src/types/navigation';
-import {BillData} from '../../types/types';
-import {
-  deleteBill,
-  deleteGroup,
-  getBills,
-  getGroups,
-  saveBill,
-  saveGroup,
-} from '../../utils/util';
-import {useContext, useEffect, useMemo, useState} from 'react';
+import { Text } from '../../components/ui/text';
+import { HStack } from '../../components/ui/hstack';
+import { Button, ButtonText } from '../../components/ui/button';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '@/src/types/navigation';
+import { useMemo, useRef, useState } from 'react';
 import EditDeleteAction from '../../components/other/EditDeleteAction';
-import useOptimistic from '../../hooks/useOptimistic';
 import ConfirmationModal from '../../components/modals/ConfirmationModal';
 import MoreTotalModal from '../../components/modals/MoreTotalModal';
 import RippleButton from '../../components/btns/RippleButton';
-import useCustomToast from '../../hooks/useToast';
 import EmptyImage from '../../assets/images/empty.png';
-import {Image} from '../../components/ui/image';
+import { Image } from '../../components/ui/image';
 import Groups from '../../components/other/Groups';
 import AddGroupModal from '../../components/modals/AddGroupModal';
-import {GlobalContext} from '../../../App';
+import Carousel, { ICarouselInstance } from 'react-native-reanimated-carousel';
+import CarouselRenderView from './CarouselRenderView';
+import { useSharedValue } from 'react-native-reanimated';
+import { VStack } from '../../components/ui/vstack';
+import useGroupHandler, { GroupHandlerEvent } from './hooks/useGroupHandler';
+import useBillHandler, { BillHandlerEvent } from './hooks/useBillHandler';
+import { useEventAction } from '../../hooks/useEventAction';
+import useActionSheetHandler, { ActionSheetEvent } from './hooks/useActionSheetHandler';
+import useGroupStore from '../../store/useGroupStore';
+import useBillStore from '../../store/useBillStore';
 
 type HomeProps = NativeStackScreenProps<RootStackParamList, 'Home', 'Stack'>;
 
-interface BillsOptimisticAction {
-  type: 'delete' | 'update';
-  id: string;
-  data?: {
-    name: string;
-    value: string | number | boolean;
-  };
-}
+const screenWidth = Dimensions.get("window").width;
+const screenHeight = Dimensions.get("window").height;
 
-const Home = ({navigation}: HomeProps) => {
+const Home = ({ navigation }: HomeProps) => {
+  const carouselRef = useRef<ICarouselInstance>(null);
+  const carouselProgress = useSharedValue<number>(0);
+
+  const { handleOnAddGroup, handleOnDeleteGroup } = useGroupHandler();
+  const { billsData, handleOnBillCardPress, handleOnResetAllPaidPress } = useBillHandler();
   const {
-    activeGroup: activeGroupContext,
-    setActiveGroup: setActiveGroupContext,
-  } = useContext(GlobalContext);
-  const {showNewToast} = useCustomToast();
+    showActionsheet,
+    handleOnCloseActionsheet,
+    handleOnDeleteActionPress,
+    handleOnEditActionPress,
+    handleOnPaidActionPress, 
+    handleResetPaidActionPress
+  } = useActionSheetHandler();
 
-  const [groups, setGroups] = useState<string[]>([]);
-  const [bills, setBills] = useState<BillData[]>([]);
-  const [selectedBillId, setSelectedBillId] = useState<string>('');
-  const [activeGroup, setActiveGroup] = useState<string>('');
+  const { groups, activeGroup, setActiveGroup, setActiveGroupIdx } = useGroupStore();
+  const { selectedBillId, setSelectedBillId } = useBillStore();
 
   const [isShowResetAllModal, setIsShowResetAllModal] = useState(false);
   const [isShowDeleteModal, setIsShowDeleteModal] = useState(false);
   const [isShowTotalsModal, setIsShowTotalsModal] = useState(false);
   const [isShowAddGroupModal, setIsShowAddGroupModal] = useState(false);
 
-  const [billsOpt, updateBillsOpt] = useOptimistic(
-    bills,
-    (curr, action: BillsOptimisticAction) => {
-      if (action.type === 'delete') {
-        return curr.filter(bill => bill.id !== action.id);
-      }
-
-      if (action.type === 'update') {
-        if (!action.data) {
-          return curr;
-        }
-
-        return curr.map(bill => {
-          if (bill.id === action.id) {
-            if (action.data && action.data.value !== undefined) {
-              return {...bill, [action.data.name]: action.data.value};
-            }
-            return bill;
-          }
-          return bill;
-        });
-      }
-
-      return curr;
-    },
-  );
-
   const total = useMemo(
-    () => billsOpt.reduce((acc, curr) => acc + curr.amount, 0),
-    [billsOpt],
+    () => billsData[activeGroup]?.reduce((acc, curr) => acc + curr.amount, 0) || 0,
+    [billsData],
   );
 
-  const [showActionsheet, setShowActionsheet] = useState(false);
-
-  useEffect(() => {
-    const fetchBills = async () => {
-      const _groups = await getGroups();
-      setGroups(_groups ?? []);
-
-      if (_groups.length > 0) {
-        const ag = activeGroupContext;
-
-        const _bills = await getBills(ag || _groups?.[0]);
-        setBills(_bills ?? []);
-
-        setActiveGroup(ag || _groups?.[0] || '');
-      }
-    };
-
-    fetchBills();
-  }, []);
-
-  useEffect(() => {
-    const fetchBills = async () => {
-      const _bills = await getBills(activeGroup);
-      setBills(_bills ?? []);
-    };
-
-    fetchBills();
-  }, [activeGroup]);
-
-  const handleOnAddGroup = async (groupName: string) => {
-    setGroups(prev => {
-      return [...prev, groupName];
-    });
-
-    if (activeGroup === '') {
-      setActiveGroup(groupName);
-    }
-
-    if (await saveGroup(groupName)) {
-      showNewToast('New Group Added', 'Group added successfully');
-    } else {
-      showNewToast('Error', 'Failed to add group', 'err');
-    }
-
-    setIsShowAddGroupModal(false);
-  };
-
-  const handleOnCloseActionsheet = () => {
-    setShowActionsheet(false);
-    setSelectedBillId('');
-  };
-
-  const handleOnBillCardPress = (id: string) => {
-    setSelectedBillId(id);
-    setShowActionsheet(true);
-  };
-
-  const handleOnEditPress = () => {
-    setShowActionsheet(false);
+  useEventAction(ActionSheetEvent.ON_EDIT_BILL, () => {
+    // Handle edit action
     navigation.navigate({
       name: 'AddBill',
-      params: {id: selectedBillId, group: activeGroup},
+      params: { id: selectedBillId, group: activeGroup },
     });
     setSelectedBillId('');
-  };
+  });
 
-  const handleOnPaidPress = async () => {
-    updateBillsOpt({
-      type: 'update',
-      id: selectedBillId,
-      data: {name: 'isPaid', value: true},
-    });
-    updateBillsOpt({
-      type: 'update',
-      id: selectedBillId,
-      data: {name: 'amount', value: 0},
-    });
-
-    // the actual update function
-    const billToUpdate = billsOpt.find(bill => bill.id === selectedBillId);
-    let isSaved = false;
-    if (billToUpdate) {
-      isSaved = await saveBill(activeGroup, {
-        ...billToUpdate,
-        isPaid: true,
-        amount: 0,
-      });
-    }
-
-    setShowActionsheet(false);
-    setSelectedBillId('');
-    if (isSaved) {
-      showNewToast('Paid Success', 'Mark the bill as paid successfully');
-    } else {
-      showNewToast('Error', 'Failed to mark the bill as paid', 'err');
-    }
-  };
-
-  const handleOnResetAllPaidPress = async () => {
-    let hasError = false;
-    for (let i = 0; i < billsOpt.length; i++) {
-      const bill = billsOpt[i];
-
-      // updates the UI data
-      updateBillsOpt({
-        type: 'update',
-        id: bill.id,
-        data: {name: 'isPaid', value: false},
-      });
-      updateBillsOpt({
-        type: 'update',
-        id: bill.id,
-        data: {name: 'amount', value: 0},
-      });
-
-      // the actual update function
-      const billToUpdate = billsOpt.find(_bill => _bill.id === bill.id);
-      if (billToUpdate) {
-        hasError = hasError
-          ? hasError
-          : !(await saveBill(activeGroup, {
-              ...billToUpdate,
-              isPaid: false,
-              amount: bill.amount,
-            }));
-      }
-    }
-
-    setIsShowResetAllModal(false);
-    setSelectedBillId('');
-
-    if (!hasError) {
-      showNewToast(
-        'Reset All Success',
-        'Reset all the paid bills successfully',
-      );
-    } else {
-      showNewToast('Error', 'Failed to reset all the paid bills', 'err');
-    }
-  };
-
-  const handleResetPaidPress = async () => {
-    updateBillsOpt({
-      type: 'update',
-      id: selectedBillId,
-      data: {name: 'isPaid', value: false},
-    });
-    updateBillsOpt({
-      type: 'update',
-      id: selectedBillId,
-      data: {name: 'amount', value: 0},
-    });
-
-    // the actual update function
-    const billToUpdate = billsOpt.find(bill => bill.id === selectedBillId);
-    let isSaved = false;
-    if (billToUpdate) {
-      isSaved = await saveBill(activeGroup, {
-        ...billToUpdate,
-        isPaid: false,
-        amount: 0,
-      });
-    }
-
-    setShowActionsheet(false);
-    setSelectedBillId('');
-
-    if (isSaved) {
-      showNewToast('Reset Success', 'Reset the paid bill successfully');
-    } else {
-      showNewToast('Error', 'Failed to reset the paid bill', 'err');
-    }
-  };
-
-  const handleOnDeleteBill = async () => {
-    updateBillsOpt({type: 'delete', id: selectedBillId});
-    // the actual delete function
-    const isDeleted = await deleteBill(activeGroup, selectedBillId);
-    setSelectedBillId('');
-    setShowActionsheet(false);
+  useEventAction(ActionSheetEvent.ON_DELETE_BILL, async () => {
+    // Handle delete action
     setIsShowDeleteModal(false);
+  });
 
-    if (isDeleted) {
-      showNewToast('Delete Success', 'Delete the bill successfully');
-    } else {
-      showNewToast('Error', 'Failed to delete the bill', 'err');
-    }
-  };
+  useEventAction(GroupHandlerEvent.ON_ADD_GROUP, () => {
+    setIsShowAddGroupModal(false);
+  });
 
-  const handleOnDeleteGroup = async (group: string) => {
-    const updatedGroups = groups.filter(grp => grp !== group);
-    setGroups(updatedGroups);
+  useEventAction(GroupHandlerEvent.ON_DELETE_GROUP, () => {
+    setIsShowDeleteModal(false);
+  });
 
-    // the actual delete function
-    const isDeleted = await deleteGroup(group);
-    setActiveGroup(updatedGroups[0] ?? '');
+  useEventAction(BillHandlerEvent.ON_PRESS_RESET_ALL_PAID, () => {
+    setIsShowResetAllModal(false);
+  });
 
-    if (isDeleted) {
-      showNewToast('Delete Success', 'Delete the group successfully');
-    } else {
-      showNewToast('Error', 'Failed to delete the group', 'err');
-    }
-  };
+  const handleOnCarouselScrollEnd = (index: number) => {
+    // setActiveGroup(groups[index] || '');
+    // setActiveGroupIdx(index);
+  }
 
   return (
     <>
@@ -302,7 +99,7 @@ const Home = ({navigation}: HomeProps) => {
         isOpen={isShowDeleteModal}
         onClosed={() => setIsShowDeleteModal(false)}
         onNegativePressed={() => setIsShowDeleteModal(false)}
-        onPositivePressed={handleOnDeleteBill}
+        onPositivePressed={handleOnDeleteActionPress}
         title="Delete Bill"
         description="Are you sure to delete the bill?"
       />
@@ -317,7 +114,7 @@ const Home = ({navigation}: HomeProps) => {
       />
 
       <MoreTotalModal
-        bills={billsOpt}
+        activeBills={billsData[activeGroup] || []}
         isOpen={isShowTotalsModal}
         onClosed={() => setIsShowTotalsModal(false)}
         onPositivePressed={() => setIsShowTotalsModal(false)}
@@ -362,42 +159,52 @@ const Home = ({navigation}: HomeProps) => {
           <Groups
             groups={groups}
             activeGroup={activeGroup}
-            onGroupNamePressed={group => {
+            onGroupNamePressed={(group, index) => {
+              setActiveGroupIdx(index);
               setActiveGroup(group);
-              setActiveGroupContext(group);
             }}
             onAddGroupPressed={() => setIsShowAddGroupModal(true)}
             onDeleteGroupPressed={handleOnDeleteGroup}
           />
 
-          {billsOpt.length > 0 && (
-            <>
-              <HStack>
-                <RippleButton
-                  onPress={() => setIsShowResetAllModal(true)}
-                  className={clsx('mt-5')}>
-                  <Text className={clsx('text-xl')}>Reset All Paid</Text>
-                </RippleButton>
-              </HStack>
+          {groups.length > 0 && (
+            <VStack space='sm'>
+              {billsData[activeGroup]?.length > 0 && (
+                <HStack>
+                  <RippleButton
+                    onPress={() => setIsShowResetAllModal(true)}
+                    className={clsx('mt-5')}>
+                    <Text className={clsx('text-xl')}>Reset All Paid</Text>
+                  </RippleButton>
+                </HStack>
+              )}
 
-              <FlatList
-                data={billsOpt}
-                renderItem={({item}) => (
-                  <BillCard
-                    key={item.id}
-                    title={item.title}
-                    tag={item.tag}
-                    amount={item.amount.toLocaleString()}
-                    isPaid={item.isPaid}
-                    isSelected={selectedBillId === item.id}
-                    onPress={() => handleOnBillCardPress(item.id)}
+              <Carousel
+                ref={carouselRef}
+                width={screenWidth * 0.95}
+                height={screenHeight * 0.58}
+                style={{
+                  width: screenWidth,
+                  paddingBottom: 0,
+                }}
+                data={groups}
+                loop={false}
+                onProgressChange={carouselProgress}
+                onScrollEnd={handleOnCarouselScrollEnd}
+                renderItem={({ index }) => (
+                  <CarouselRenderView
+                    key={index}
+                    renderIdx={index}
+                    selectedBillId={selectedBillId}
+                    handleOnBillCardPress={handleOnBillCardPress}
+                    data={billsData}
                   />
                 )}
               />
-            </>
+            </VStack>
           )}
 
-          {billsOpt.length === 0 && (
+          {groups.length === 0 && (
             <Box
               className={clsx(
                 'flex',
@@ -410,7 +217,7 @@ const Home = ({navigation}: HomeProps) => {
                 className={clsx('w-28', 'h-28', 'mb-5', 'filter')}
                 alt="Empty Image"
               />
-              <Text>No added bills yet.</Text>
+              <Text>No added groups yet.</Text>
             </Box>
           )}
 
@@ -423,7 +230,7 @@ const Home = ({navigation}: HomeProps) => {
               onPress={() => {
                 navigation.navigate({
                   name: 'AddBill',
-                  params: {id: undefined, group: activeGroup},
+                  params: { id: undefined, group: activeGroup },
                 });
               }}>
               <ButtonText className={clsx('text-2xl', 'font-interbold')}>
@@ -433,13 +240,13 @@ const Home = ({navigation}: HomeProps) => {
           )}
 
           <EditDeleteAction
-            isPaid={billsOpt.find(bill => bill.id === selectedBillId)?.isPaid}
+            isPaid={billsData[activeGroup]?.find(bill => bill.id === selectedBillId)?.isPaid}
             showActionsheet={showActionsheet}
             onClose={handleOnCloseActionsheet}
             onDeletePress={() => setIsShowDeleteModal(true)}
-            onEditPress={handleOnEditPress}
-            onPaidPress={handleOnPaidPress}
-            onResetPress={handleResetPaidPress}
+            onEditPress={handleOnEditActionPress}
+            onPaidPress={handleOnPaidActionPress}
+            onResetPress={handleResetPaidActionPress}
           />
         </Box>
       </SafeAreaView>

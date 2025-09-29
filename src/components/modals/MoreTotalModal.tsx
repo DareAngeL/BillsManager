@@ -9,7 +9,7 @@ import clsx from 'clsx';
 import { Box } from '../ui/box';
 
 interface MoreTotalProps {
-    bills: BillData[];
+    activeBills: BillData[];
     title: string;
     isOpen: boolean;
     onClosed: () => void;
@@ -20,7 +20,7 @@ interface TotalByTag {
     [key: string]: number;
 }
 
-const MoreTotalModal = ({ bills, isOpen, onClosed, onPositivePressed, title }: MoreTotalProps) => {
+const MoreTotalModal = ({ activeBills: bills, isOpen, onClosed, onPositivePressed, title }: MoreTotalProps) => {
 
     const totals = useMemo(() => {
         return bills?.reduce<TotalByTag>((acc, curr) => {
