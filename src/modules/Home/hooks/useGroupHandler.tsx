@@ -2,6 +2,8 @@ import { deleteGroup, saveGroup } from "../../../utils/util";
 import useGroupStore from "../../../store/useGroupStore";
 import useCustomToast from "../../../hooks/useToast";
 import eventBus from "../../../services/EventBus";
+import { useEventAction } from "../../../hooks/useEventAction";
+import { CarouselHandlerEvent } from "./useCarouselHandler";
 
 export enum GroupHandlerEvent {
   ON_ADD_GROUP = 'add-grp',
@@ -15,9 +17,15 @@ const useGroupHandler = () => {
   const {
     groups,
     activeGroup,
+    setActiveGroupIdx,
     setActiveGroup,
     setGroups
   } = useGroupStore();
+
+  useEventAction(CarouselHandlerEvent.ON_SCROLL_END, (index: number) => {
+    setActiveGroup(groups[index] || '');
+    setActiveGroupIdx(index);
+  });
 
   const handleOnAddGroup = async (groupName: string) => {
     setGroups([...groups, groupName]);

@@ -9,7 +9,7 @@ import { HStack } from '../../components/ui/hstack';
 import { Button, ButtonText } from '../../components/ui/button';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/src/types/navigation';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import EditDeleteAction from '../../components/other/EditDeleteAction';
 import ConfirmationModal from '../../components/modals/ConfirmationModal';
 import MoreTotalModal from '../../components/modals/MoreTotalModal';
@@ -28,6 +28,7 @@ import { useEventAction } from '../../hooks/useEventAction';
 import useActionSheetHandler, { ActionSheetEvent } from './hooks/useActionSheetHandler';
 import useGroupStore from '../../store/useGroupStore';
 import useBillStore from '../../store/useBillStore';
+import useCarouselHandler from './hooks/useCarouselHandler';
 
 type HomeProps = NativeStackScreenProps<RootStackParamList, 'Home', 'Stack'>;
 
@@ -40,16 +41,17 @@ const Home = ({ navigation }: HomeProps) => {
 
   const { handleOnAddGroup, handleOnDeleteGroup } = useGroupHandler();
   const { billsData, handleOnBillCardPress, handleOnResetAllPaidPress } = useBillHandler();
+  const { handleOnCarouselScrollEnd } = useCarouselHandler();
   const {
     showActionsheet,
     handleOnCloseActionsheet,
     handleOnDeleteActionPress,
     handleOnEditActionPress,
-    handleOnPaidActionPress, 
+    handleOnPaidActionPress,
     handleResetPaidActionPress
   } = useActionSheetHandler();
 
-  const { groups, activeGroup, setActiveGroup, setActiveGroupIdx } = useGroupStore();
+  const { groups, activeGroup, activeGroupIdx, setActiveGroup, setActiveGroupIdx } = useGroupStore();
   const { selectedBillId, setSelectedBillId } = useBillStore();
 
   const [isShowResetAllModal, setIsShowResetAllModal] = useState(false);
@@ -59,8 +61,14 @@ const Home = ({ navigation }: HomeProps) => {
 
   const total = useMemo(
     () => billsData[activeGroup]?.reduce((acc, curr) => acc + curr.amount, 0) || 0,
-    [billsData],
+    [activeGroup, billsData],
   );
+
+  useEffect(() => {
+    if (carouselRef.current && typeof activeGroupIdx === 'number') {
+      carouselRef.current.scrollTo({ index: activeGroupIdx, animated: true });
+    }
+  }, [activeGroupIdx]);
 
   useEventAction(ActionSheetEvent.ON_EDIT_BILL, () => {
     // Handle edit action
@@ -87,11 +95,6 @@ const Home = ({ navigation }: HomeProps) => {
   useEventAction(BillHandlerEvent.ON_PRESS_RESET_ALL_PAID, () => {
     setIsShowResetAllModal(false);
   });
-
-  const handleOnCarouselScrollEnd = (index: number) => {
-    // setActiveGroup(groups[index] || '');
-    // setActiveGroupIdx(index);
-  }
 
   return (
     <>
@@ -189,6 +192,9 @@ const Home = ({ navigation }: HomeProps) => {
                 }}
                 data={groups}
                 loop={false}
+                onConfigurePanGesture={gestureChain => (
+                  gestureChain.activeOffsetX([-10, 10])
+                )}
                 onProgressChange={carouselProgress}
                 onScrollEnd={handleOnCarouselScrollEnd}
                 renderItem={({ index }) => (

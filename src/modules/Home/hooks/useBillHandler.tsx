@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BillData } from "../../../types/types";
 import useOptimistic from "../../../hooks/useOptimistic";
 import { deleteBill, getBills, getGroups, saveBill } from "../../../utils/util";
@@ -197,10 +197,10 @@ const useBillHandler = () => {
     }
   });
 
-  const handleOnBillCardPress = (id: string) => {
+  const handleOnBillCardPress = useCallback((id: string) => {
     setSelectedBillId(id);
     eventBus.emit(BillHandlerEvent.ON_PRESS_BILL_CARD);
-  };
+  }, [setSelectedBillId]);
 
   const handleOnResetAllPaidPress = async () => {
     eventBus.emit(BillHandlerEvent.ON_PRESS_RESET_ALL_PAID);

@@ -48,6 +48,8 @@ const CarouselRenderView = ({
 
 			<FlatList
 				data={data[activeGroup] || []}
+				nestedScrollEnabled={true}
+				scrollEventThrottle={16}
 				renderItem={({ item }) => (
 					<BillCard
 						key={item.id}

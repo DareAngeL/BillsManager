@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import eventBus from "../../../services/EventBus";
 import { useEventAction } from "../../../hooks/useEventAction";
 import { BillHandlerEvent } from "./useBillHandler";
@@ -14,42 +14,55 @@ export enum ActionSheetEvent {
 const useActionSheetHandler = () => {
 
   const [showActionsheet, setShowActionsheet] = useState(false);
+  const isOpeningRef = useRef(false);
 
-  useEventAction(BillHandlerEvent.ON_PRESS_BILL_CARD, useCallback(() => {
-    setShowActionsheet(prevState => {
-      if (prevState) {
-        return prevState; // Prevent setting to true if already true
-      }
-      return true;
-    });
-  }, []));
+  const handleBillCardPress = useCallback(() => {
+    // Prevent opening if already opening or already open
+    if (isOpeningRef.current || showActionsheet) {
+      return;
+    }
+    
+    isOpeningRef.current = true;
+    
+    setShowActionsheet(true);
+    
+    // Reset the flag after a short delay
+    setTimeout(() => {
+      isOpeningRef.current = false;
+    }, 200);
+  }, [showActionsheet]);
 
-  const handleOnEditActionPress = () => {
+  useEventAction(BillHandlerEvent.ON_PRESS_BILL_CARD, handleBillCardPress);
+
+  const handleOnEditActionPress = useCallback(() => {
+    isOpeningRef.current = false;
     setShowActionsheet(false);
     eventBus.emit(ActionSheetEvent.ON_EDIT_BILL);
-  };
+  }, []);
 
-  const handleOnPaidActionPress = async () => {
+  const handleOnPaidActionPress = useCallback(async () => {
+    isOpeningRef.current = false;
     setShowActionsheet(false);
     eventBus.emit(ActionSheetEvent.ON_PAID_BILL);
-  };
+  }, []);
 
-  const handleResetPaidActionPress = async () => {
+  const handleResetPaidActionPress = useCallback(async () => {
+    isOpeningRef.current = false;
     setShowActionsheet(false);
     eventBus.emit(ActionSheetEvent.ON_RESET_PAID);
-  };
+  }, []);
 
-  const handleOnDeleteActionPress = async () => {
-    
+  const handleOnDeleteActionPress = useCallback(async () => {
+    isOpeningRef.current = false;
     setShowActionsheet(false);
     eventBus.emit(ActionSheetEvent.ON_DELETE_BILL);
-    
-  };
+  }, []);
 
-  const handleOnCloseActionsheet = () => {
+  const handleOnCloseActionsheet = useCallback(() => {
+    isOpeningRef.current = false; // Reset the flag when closing
     setShowActionsheet(false);
     eventBus.emit(ActionSheetEvent.ON_CLOSE);
-  };
+  }, []);
 
   return {
     showActionsheet,
