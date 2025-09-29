@@ -19,13 +19,12 @@ import { Image } from '../../components/ui/image';
 import Groups from '../../components/other/Groups';
 import AddGroupModal from '../../components/modals/AddGroupModal';
 import Carousel, { ICarouselInstance } from 'react-native-reanimated-carousel';
-import CarouselRenderView from './CarouselRenderView';
+import CarouselRenderView from '../../components/views/CarouselRenderView';
 import { useSharedValue } from 'react-native-reanimated';
 import { VStack } from '../../components/ui/vstack';
-import useGroupHandler, { GroupHandlerEvent } from './hooks/useGroupHandler';
-import useBillHandler, { BillHandlerEvent } from './hooks/useBillHandler';
-import { useEventAction } from '../../hooks/useEventAction';
-import useActionSheetHandler, { ActionSheetEvent } from './hooks/useActionSheetHandler';
+import useGroupHandler from './hooks/useGroupHandler';
+import useBillHandler from './hooks/useBillHandler';
+import useActionSheetHandler from './hooks/useActionSheetHandler';
 import useGroupStore from '../../store/useGroupStore';
 import useBillStore from '../../store/useBillStore';
 import useCarouselHandler from './hooks/useCarouselHandler';
@@ -40,10 +39,11 @@ const Home = ({ navigation }: HomeProps) => {
   const carouselProgress = useSharedValue<number>(0);
 
   const { handleOnAddGroup, handleOnDeleteGroup } = useGroupHandler();
-  const { billsData, handleOnBillCardPress, handleOnResetAllPaidPress } = useBillHandler();
+  const { handleOnResetAllPaidPress } = useBillHandler();
   const { handleOnCarouselScrollEnd } = useCarouselHandler();
   const {
     showActionsheet,
+    handleOnShowActionsheet,
     handleOnCloseActionsheet,
     handleOnDeleteActionPress,
     handleOnEditActionPress,
@@ -52,49 +52,25 @@ const Home = ({ navigation }: HomeProps) => {
   } = useActionSheetHandler();
 
   const { groups, activeGroup, activeGroupIdx, setActiveGroup, setActiveGroupIdx } = useGroupStore();
-  const { selectedBillId, setSelectedBillId } = useBillStore();
+  const { optimisticBills, selectedBillId } = useBillStore();
 
   const [isShowResetAllModal, setIsShowResetAllModal] = useState(false);
   const [isShowDeleteModal, setIsShowDeleteModal] = useState(false);
   const [isShowTotalsModal, setIsShowTotalsModal] = useState(false);
   const [isShowAddGroupModal, setIsShowAddGroupModal] = useState(false);
 
-  const total = useMemo(
-    () => billsData[activeGroup]?.reduce((acc, curr) => acc + curr.amount, 0) || 0,
-    [activeGroup, billsData],
+  const balance = useMemo(
+    () => optimisticBills[activeGroup]?.filter(bill => !bill.isPaid).reduce((acc, curr) => acc + curr.amount, 0) || 0,
+    [activeGroup, optimisticBills],
   );
 
   useEffect(() => {
-    if (carouselRef.current && typeof activeGroupIdx === 'number') {
-      carouselRef.current.scrollTo({ index: activeGroupIdx, animated: true });
-    }
+    setTimeout(() => {
+      if (carouselRef.current && typeof activeGroupIdx === 'number') {
+        carouselRef.current.scrollTo({ index: activeGroupIdx, animated: true });
+      }
+    }, 100);
   }, [activeGroupIdx]);
-
-  useEventAction(ActionSheetEvent.ON_EDIT_BILL, () => {
-    // Handle edit action
-    navigation.navigate({
-      name: 'AddBill',
-      params: { id: selectedBillId, group: activeGroup },
-    });
-    setSelectedBillId('');
-  });
-
-  useEventAction(ActionSheetEvent.ON_DELETE_BILL, async () => {
-    // Handle delete action
-    setIsShowDeleteModal(false);
-  });
-
-  useEventAction(GroupHandlerEvent.ON_ADD_GROUP, () => {
-    setIsShowAddGroupModal(false);
-  });
-
-  useEventAction(GroupHandlerEvent.ON_DELETE_GROUP, () => {
-    setIsShowDeleteModal(false);
-  });
-
-  useEventAction(BillHandlerEvent.ON_PRESS_RESET_ALL_PAID, () => {
-    setIsShowResetAllModal(false);
-  });
 
   return (
     <>
@@ -102,7 +78,10 @@ const Home = ({ navigation }: HomeProps) => {
         isOpen={isShowDeleteModal}
         onClosed={() => setIsShowDeleteModal(false)}
         onNegativePressed={() => setIsShowDeleteModal(false)}
-        onPositivePressed={handleOnDeleteActionPress}
+        onPositivePressed={() => {
+          handleOnDeleteActionPress()
+          setIsShowDeleteModal(false);
+        }}
         title="Delete Bill"
         description="Are you sure to delete the bill?"
       />
@@ -111,13 +90,16 @@ const Home = ({ navigation }: HomeProps) => {
         isOpen={isShowResetAllModal}
         onClosed={() => setIsShowResetAllModal(false)}
         onNegativePressed={() => setIsShowResetAllModal(false)}
-        onPositivePressed={handleOnResetAllPaidPress}
+        onPositivePressed={() => {
+          handleOnResetAllPaidPress();
+          setIsShowResetAllModal(false);
+        }}
         title="Reset All Paid"
         description="Are you sure to reset all the paid bills?"
       />
 
       <MoreTotalModal
-        activeBills={billsData[activeGroup] || []}
+        activeBills={optimisticBills[activeGroup] || []}
         isOpen={isShowTotalsModal}
         onClosed={() => setIsShowTotalsModal(false)}
         onPositivePressed={() => setIsShowTotalsModal(false)}
@@ -129,7 +111,10 @@ const Home = ({ navigation }: HomeProps) => {
         title="Add Group +"
         onClosed={() => setIsShowAddGroupModal(false)}
         onNegativePressed={() => setIsShowAddGroupModal(false)}
-        onPositivePressed={handleOnAddGroup}
+        onPositivePressed={(group) => {
+          handleOnAddGroup(group);
+          setIsShowAddGroupModal(false);
+        }}
       />
 
       <SafeAreaView className={clsx('p-5')}>
@@ -140,7 +125,7 @@ const Home = ({ navigation }: HomeProps) => {
 
           <HStack className={clsx('mt-7', 'items-center')}>
             <HStack space="sm" className={clsx('me-auto')}>
-              <Text className={clsx('text-xl')}>Total:</Text>
+              <Text className={clsx('text-xl')}>Balance:</Text>
 
               <Text
                 className={clsx(
@@ -148,7 +133,7 @@ const Home = ({ navigation }: HomeProps) => {
                   'color-secondary-500',
                   'font-interbold',
                 )}>
-                ₱{total.toLocaleString()}
+                ₱{balance.toLocaleString()}
               </Text>
             </HStack>
 
@@ -163,8 +148,8 @@ const Home = ({ navigation }: HomeProps) => {
             groups={groups}
             activeGroup={activeGroup}
             onGroupNamePressed={(group, index) => {
-              setActiveGroupIdx(index);
               setActiveGroup(group);
+              setActiveGroupIdx(index);
             }}
             onAddGroupPressed={() => setIsShowAddGroupModal(true)}
             onDeleteGroupPressed={handleOnDeleteGroup}
@@ -172,7 +157,7 @@ const Home = ({ navigation }: HomeProps) => {
 
           {groups.length > 0 && (
             <VStack space='sm'>
-              {billsData[activeGroup]?.length > 0 && (
+              {optimisticBills[activeGroup]?.length > 0 && (
                 <HStack>
                   <RippleButton
                     onPress={() => setIsShowResetAllModal(true)}
@@ -202,8 +187,8 @@ const Home = ({ navigation }: HomeProps) => {
                     key={index}
                     renderIdx={index}
                     selectedBillId={selectedBillId}
-                    handleOnBillCardPress={handleOnBillCardPress}
-                    data={billsData}
+                    handleOnBillCardPress={handleOnShowActionsheet}
+                    data={optimisticBills}
                   />
                 )}
               />
@@ -246,11 +231,17 @@ const Home = ({ navigation }: HomeProps) => {
           )}
 
           <EditDeleteAction
-            isPaid={billsData[activeGroup]?.find(bill => bill.id === selectedBillId)?.isPaid}
+            isPaid={optimisticBills[activeGroup]?.find(bill => bill.id === selectedBillId)?.isPaid}
             showActionsheet={showActionsheet}
             onClose={handleOnCloseActionsheet}
             onDeletePress={() => setIsShowDeleteModal(true)}
-            onEditPress={handleOnEditActionPress}
+            onEditPress={() => {
+              handleOnEditActionPress();
+              navigation.navigate({
+                name: 'AddBill',
+                params: { id: selectedBillId, group: activeGroup },
+              });
+            }}
             onPaidPress={handleOnPaidActionPress}
             onResetPress={handleResetPaidActionPress}
           />

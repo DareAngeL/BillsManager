@@ -1,12 +1,12 @@
 import { FlatList } from "react-native"
-import { Box } from "../../components/ui/box"
+import { Box } from "../ui/box"
 import { BillData } from "../../types/types"
-import BillCard from "../../components/cards/BillCard"
-import { useMemo } from "react"
+import BillCard from "../cards/BillCard"
+import { memo, useMemo } from "react"
 import clsx from "clsx"
 import EmptyImage from '../../assets/images/empty.png';
-import { Image } from "../../components/ui/image"
-import { Text } from "../../components/ui/text"
+import { Image } from "../ui/image"
+import { Text } from "../ui/text"
 
 interface CarouselRenderViewProps {
 	renderIdx?: number
@@ -24,11 +24,8 @@ const CarouselRenderView = ({
 
 	const activeGroup = useMemo(() => Object.keys(data)[renderIdx || 0] || '', [data, renderIdx]);
 
-	console.log('activeGroup', activeGroup, renderIdx, data);
-	
-
 	return (
-		<Box key={renderIdx} className={clsx('me-4')}>
+		<Box className={clsx('me-4')}>
 			{(!data[activeGroup] || data[activeGroup].length === 0) && (
 				<Box
 					className={clsx(
@@ -66,4 +63,4 @@ const CarouselRenderView = ({
 	)
 }
 
-export default CarouselRenderView
+export default memo(CarouselRenderView)

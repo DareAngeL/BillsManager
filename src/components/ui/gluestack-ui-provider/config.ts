@@ -27,7 +27,7 @@ export const config = {
     '--color-secondary-100': '246 246 246',
     '--color-secondary-200': '242 242 242',
     '--color-secondary-300': '237 237 237',
-    '--color-secondary-400': '230 230 231',
+    '--color-secondary-400': '255 175 94',
     '--color-secondary-500': '216 108 0',
     '--color-secondary-600': '198 199 199',
     '--color-secondary-700': '189 189 189',
