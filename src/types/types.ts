@@ -5,3 +5,5 @@ export type BillData = {
   amount: number;
   isPaid: boolean;
 };
+
+export type SortOption = 'none' | 'tag-asc' | 'tag-desc' | 'paid-first' | 'unpaid-first';

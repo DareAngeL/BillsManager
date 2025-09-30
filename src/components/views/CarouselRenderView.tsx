@@ -7,6 +7,7 @@ import clsx from "clsx"
 import EmptyImage from '../../assets/images/empty.png';
 import { Image } from "../ui/image"
 import { Text } from "../ui/text"
+import useBillStore from "../../store/useBillStore"
 
 interface CarouselRenderViewProps {
 	renderIdx?: number
@@ -22,11 +23,13 @@ const CarouselRenderView = ({
 	data
 }: CarouselRenderViewProps) => {
 
+	const { getSortedBills, sortOption } = useBillStore();
 	const activeGroup = useMemo(() => Object.keys(data)[renderIdx || 0] || '', [data, renderIdx]);
+	const sortedBills = useMemo(() => getSortedBills(activeGroup), [getSortedBills, activeGroup, data, sortOption]);
 
 	return (
 		<Box className={clsx('me-4')}>
-			{(!data[activeGroup] || data[activeGroup].length === 0) && (
+			{(!sortedBills || sortedBills.length === 0) && (
 				<Box
 					className={clsx(
 						'flex',
@@ -44,7 +47,7 @@ const CarouselRenderView = ({
 			)}
 
 			<FlatList
-				data={data[activeGroup] || []}
+				data={sortedBills}
 				nestedScrollEnabled={true}
 				scrollEventThrottle={16}
 				renderItem={({ item }) => (

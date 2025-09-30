@@ -28,6 +28,8 @@ import useActionSheetHandler from './hooks/useActionSheetHandler';
 import useGroupStore from '../../store/useGroupStore';
 import useBillStore from '../../store/useBillStore';
 import useCarouselHandler from './hooks/useCarouselHandler';
+import FilterIcon from '../../components/other/FilterIcon';
+import SortModal from '../../components/modals/SortModal';
 
 type HomeProps = NativeStackScreenProps<RootStackParamList, 'Home', 'Stack'>;
 
@@ -52,12 +54,13 @@ const Home = ({ navigation }: HomeProps) => {
   } = useActionSheetHandler();
 
   const { groups, activeGroup, activeGroupIdx, setActiveGroup, setActiveGroupIdx } = useGroupStore();
-  const { optimisticBills, selectedBillId } = useBillStore();
+  const { optimisticBills, selectedBillId, sortOption } = useBillStore();
 
   const [isShowResetAllModal, setIsShowResetAllModal] = useState(false);
   const [isShowDeleteModal, setIsShowDeleteModal] = useState(false);
   const [isShowTotalsModal, setIsShowTotalsModal] = useState(false);
   const [isShowAddGroupModal, setIsShowAddGroupModal] = useState(false);
+  const [isShowSortModal, setIsShowSortModal] = useState(false);
 
   const balance = useMemo(
     () => optimisticBills[activeGroup]?.filter(bill => !bill.isPaid).reduce((acc, curr) => acc + curr.amount, 0) || 0,
@@ -117,6 +120,11 @@ const Home = ({ navigation }: HomeProps) => {
         }}
       />
 
+      <SortModal
+        isOpen={isShowSortModal}
+        onClose={() => setIsShowSortModal(false)}
+      />
+
       <SafeAreaView className={clsx('p-5')}>
         <StatusBar barStyle="dark-content" backgroundColor="#F2F2F2" />
 
@@ -158,12 +166,17 @@ const Home = ({ navigation }: HomeProps) => {
           {groups.length > 0 && (
             <VStack space='sm'>
               {optimisticBills[activeGroup]?.length > 0 && (
-                <HStack>
+                <HStack className={clsx('justify-between', 'items-center')}>
                   <RippleButton
                     onPress={() => setIsShowResetAllModal(true)}
                     className={clsx('mt-5')}>
                     <Text className={clsx('text-xl')}>Reset All Paid</Text>
                   </RippleButton>
+                  
+                  <FilterIcon
+                    onPress={() => setIsShowSortModal(true)}
+                    isActive={sortOption !== 'none'}
+                  />
                 </HStack>
               )}
 
